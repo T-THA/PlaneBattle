@@ -1,0 +1,54 @@
+  pl_move 的原稿
+  本来是用下面的来读 但是阻塞函数 不够流畅
+  就进行了一个操作的改
+  
+  char tmp=_getch();
+
+  switch(tmp){
+      case 'w':
+         player.y-=speed;
+         break;
+      case 'W':
+         player.y-=speed;
+         break;      
+
+      case 's':
+         player.y+=speed;
+         break;
+      case 'S':
+         player.y+=speed;
+         break;
+
+      case 'a':
+         player.x-=speed;
+         break;
+      case 'A':
+         player.x-=speed;
+         break;
+
+      case 'd':
+         player.x+=speed;
+         break;
+      case 'D':
+         player.x+=speed;
+         break;
+
+      case -32:
+         char tmp2=_getch();
+         switch(tmp2){
+            case 75:
+               player.x-=speed;
+               break;
+            case 72:
+               player.y-=speed;
+               break;
+            case 77:
+               player.x+=speed;
+               break;
+            case 80:
+               player.y+=speed;
+               break;
+         }
+         break;
+
+   }
