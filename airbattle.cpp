@@ -18,6 +18,7 @@ IMAGE an_bullet,an_bullet2,an_prop1,an_prop2,an_prop3;
 void pl_action();
 void en_action();
 void bu_action();
+void pr_action();
 void crash();
 void Drawinit();//图像加载进来
 void imainit();
@@ -25,22 +26,27 @@ void playerinit();
 void cr_enemy();
 void cr_plbullet();
 void cr_plbullet_buff();
+void cr_prop(int x,int y);
 void stage1();
 void stage2();
 void stage3();
+
 typedef struct Plane{//能动的东西（包括自己，敌人，道具，子弹）相当于一个父类
    int x=0;
    int y=0;
    int alive=0;
    int HP=0;
-   int damage=0;
-   int type=0; // 0为玩家/子弹 1 为knd啥都不会干，只能前进  2为mfy会发射子弹  3为ena会发射子弹且血厚
+   int type=0; // 0为玩家 子弹 
+   // enemy模式下 1 为knd啥都不会干，只能前进  2为mfy会发射子弹  3为ena会发射子弹且血厚
+   // buff模式下 1 攻击模式 2治疗 3子弹伤害
 }plane;
 
 plane player;
 plane pl_bullet[100];
 plane enemy[30];
 plane en_bullet[30][100];
+plane prop[30];
+
 DWORD ti_shoot1,ti_shoot2;
 DWORD ti_crenemy1,ti_crenemy2;
 
@@ -49,7 +55,9 @@ DWORD ti_crenemy1,ti_crenemy2;
 int bu_action_limit;
 int pl_action_limit;
 int en_action_limit;
-int is_buffed1,is_buffed2,is_buffed3;//buff1 攻击模式 buff2治疗 buff3子弹伤害
+int pr_action_limit;
+
+int is_buffed[4];
 
 int main(){
    // initgraph(X,Y,SHOWCONSOLE);//showconsole展示黑窗口
@@ -66,9 +74,10 @@ int main(){
    while(1){
       imainit();
       FlushBatchDraw();
-      pl_action();
+      if(player.alive) pl_action();
       bu_action();
       en_action();
+      pr_action();
       // printf("1\n");//test
       cr_enemy();
       crash();
@@ -108,8 +117,9 @@ void pl_action(){
 void en_action(){
    en_action_limit+=1;
    for(int i=0;i<30;i++){
-      if(enemy[i].HP<=0){
+      if(enemy[i].alive&&enemy[i].HP<=0){
          enemy[i].alive=0;
+         cr_prop(enemy[i].x,enemy[i].y);
       }
       if(enemy[i].alive&&en_action_limit%10==0){
          enemy[i].y-=1;
@@ -124,11 +134,9 @@ void bu_action(){
       if(pl_bullet[i].y<=0){
          pl_bullet[i].alive=0;
       }
-      // if((pl_bullet[i].alive)&&bu_action_limit%2==0){
-      //    pl_bullet[i].y-=1;
-      // }
+   
       if(pl_bullet[i].alive){
-         if(is_buffed1){
+         if(is_buffed[1]){
             pl_bullet[i].y-=1;
          }else if(bu_action_limit%2==0){
             pl_bullet[i].y-=1;
@@ -137,6 +145,16 @@ void bu_action(){
    }
 
    if(bu_action_limit>=2) bu_action_limit%=2;
+}
+
+
+void pr_action(){
+   pr_action_limit+=1;
+   for(int i=0;i<30;i++){
+      if(prop[i].alive&&pr_action_limit%40==0&&prop[i].y<=640) prop[i].y+=1;
+   }
+
+   if(pr_action_limit>=40) pr_action_limit%=40;
 }
 
 
@@ -150,14 +168,25 @@ void crash(){
                   &&(pl_bullet[i].y<=enemy[j].y+100&&pl_bullet[i].y>=enemy[j].y)){
                      //改成扣血
                   pl_bullet[i].alive=0;
-                  if(is_buffed3){
+                  if(is_buffed[3]){
                      enemy[j].HP-=2;
                   }else{
                      enemy[j].HP-=1;
                   }
                   break;
                }
+            }
+         }
+      }
 
+      if(player.alive){
+         if(prop[i].alive){
+            if(prop[i].x-75<=player.x&&prop[i].x+40>=player.x
+            &&prop[i].y-75<=player.y&&prop[i].y+40>=player.y){
+               prop[i].alive=0;
+               
+               int tmp=prop[i].type;
+               is_buffed[tmp]=1;
             }
          }
       }
@@ -185,7 +214,7 @@ void cr_plbullet(){
          pl_bullet[i].alive=1;
          count+=1;
       }
-      if(is_buffed1){
+      if(is_buffed[1]){
          if(count==3) break;
       }else{
       if(count==1) break;
@@ -212,12 +241,35 @@ void cr_enemy(){
       }
    }
 }
+void cr_prop(int x,int y){
+   int tmp=rand()%100;
+   if(tmp<=30){
+      for(int i=0;i<30;i++){
+         if(!prop[i].alive){
+            prop[i].x=x;
+            prop[i].y=y;
+            prop[i].alive=1;
+         
+            if(tmp<=10){
+               prop[i].type=1;
+            }else if(tmp>10&&tmp<=20){
+               prop[i].type=2;
+            }else{
+               prop[i].type=3;
+            }
 
+            break;
+         }
+      }
+   }
+   
+}
 
 void playerinit(){
    player.x=X/2;
    player.y=Y-100;
    player.alive=1;
+   player.HP=10;
    
 
    ti_shoot1=GetTickCount();
@@ -249,6 +301,20 @@ void imainit(){//图像初始化
             putimage(enemy[i].x,enemy[i].y,&an_ena,NOTSRCERASE);//这两行顺序不能换
             putimage(enemy[i].x,enemy[i].y,&ena,SRCINVERT);
          }     
+      }
+   }
+   for(int i=0;i<30;i++){
+      if(prop[i].alive){
+         if(prop[i].type==1){
+            putimage(prop[i].x,prop[i].y,&an_prop1,NOTSRCERASE);//这两行顺序不能换
+            putimage(prop[i].x,prop[i].y,&prop1,SRCINVERT);
+         }else if(prop[i].type==2){
+            putimage(prop[i].x,prop[i].y,&an_prop2,NOTSRCERASE);//这两行顺序不能换
+            putimage(prop[i].x,prop[i].y,&prop2,SRCINVERT);
+         }else if(prop[i].type==3){
+            putimage(prop[i].x,prop[i].y,&an_prop3,NOTSRCERASE);//这两行顺序不能换
+            putimage(prop[i].x,prop[i].y,&prop3,SRCINVERT);
+         }   
       }
    }
 }
