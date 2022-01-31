@@ -24,6 +24,7 @@ void imainit();
 void playerinit();
 void cr_enemy();
 void cr_plbullet();
+void cr_plbullet_buff();
 void stage1();
 void stage2();
 void stage3();
@@ -48,6 +49,7 @@ DWORD ti_crenemy1,ti_crenemy2;
 int bu_action_limit;
 int pl_action_limit;
 int en_action_limit;
+int is_buffed1,is_buffed2,is_buffed3;//buff1 攻击模式 buff2治疗 buff3子弹伤害
 
 int main(){
    // initgraph(X,Y,SHOWCONSOLE);//showconsole展示黑窗口
@@ -122,8 +124,15 @@ void bu_action(){
       if(pl_bullet[i].y<=0){
          pl_bullet[i].alive=0;
       }
-      if((pl_bullet[i].alive)&&bu_action_limit%2==0){
-         pl_bullet[i].y-=1;
+      // if((pl_bullet[i].alive)&&bu_action_limit%2==0){
+      //    pl_bullet[i].y-=1;
+      // }
+      if(pl_bullet[i].alive){
+         if(is_buffed1){
+            pl_bullet[i].y-=1;
+         }else if(bu_action_limit%2==0){
+            pl_bullet[i].y-=1;
+         }
       }
    }
 
@@ -141,7 +150,11 @@ void crash(){
                   &&(pl_bullet[i].y<=enemy[j].y+100&&pl_bullet[i].y>=enemy[j].y)){
                      //改成扣血
                   pl_bullet[i].alive=0;
-                  enemy[j].HP-=1;
+                  if(is_buffed3){
+                     enemy[j].HP-=2;
+                  }else{
+                     enemy[j].HP-=1;
+                  }
                   break;
                }
 
@@ -156,13 +169,26 @@ void cr_plbullet(){
    int count=0;
    for(int i=0;i<30;i++){
       if(!pl_bullet[i].alive){
-         pl_bullet[i].x=player.x+40;
+         switch(count){
+            case 0:
+               pl_bullet[i].x=player.x+40;
+               break;
+            case 1:
+               pl_bullet[i].x=player.x;
+               break;
+            case 2:
+               pl_bullet[i].x=player.x+80;
+               break;
+         }
+
          pl_bullet[i].y=player.y;
          pl_bullet[i].alive=1;
          count+=1;
       }
-      if(count==1){
-         break;
+      if(is_buffed1){
+         if(count==3) break;
+      }else{
+      if(count==1) break;
       }
    }
 }
@@ -222,7 +248,7 @@ void imainit(){//图像初始化
          }else if(enemy[i].type==3){
             putimage(enemy[i].x,enemy[i].y,&an_ena,NOTSRCERASE);//这两行顺序不能换
             putimage(enemy[i].x,enemy[i].y,&ena,SRCINVERT);
-         }
+         }     
       }
    }
 }
