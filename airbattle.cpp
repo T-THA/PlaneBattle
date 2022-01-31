@@ -19,6 +19,7 @@ void pl_action();
 void en_action();
 void bu_action();
 void pr_action();
+
 void crash();
 void Drawinit();//图像加载进来
 void imainit();
@@ -42,13 +43,14 @@ typedef struct Plane{//能动的东西（包括自己，敌人，道具，子弹
 }plane;
 
 plane player;
-plane pl_bullet[100];
+plane pl_bullet[30];
 plane enemy[30];
-plane en_bullet[30][100];
+plane en_bullet[30][30];
 plane prop[30];
 
 DWORD ti_shoot1,ti_shoot2;
 DWORD ti_crenemy1,ti_crenemy2;
+DWORD ti_buff[4];
 
 
 //因为子弹速度太快 用这个来控速
@@ -121,11 +123,11 @@ void en_action(){
          enemy[i].alive=0;
          cr_prop(enemy[i].x,enemy[i].y);
       }
-      if(enemy[i].alive&&en_action_limit%10==0){
-         enemy[i].y-=1;
+      if(enemy[i].alive&&en_action_limit%20==0){
+         enemy[i].y+=1;
       }
    }
-   if(en_action_limit>=4) en_action_limit%=10;
+   if(en_action_limit>=20) en_action_limit%=20;
 }
 
 void bu_action(){
@@ -153,8 +155,18 @@ void pr_action(){
    for(int i=0;i<30;i++){
       if(prop[i].alive&&pr_action_limit%40==0&&prop[i].y<=640) prop[i].y+=1;
    }
-
    if(pr_action_limit>=40) pr_action_limit%=40;
+
+
+   ti_buff[0]=GetTickCount();
+   if(is_buffed[1]&&ti_buff[0]-ti_buff[1]>=10000) is_buffed[1]=0;
+   if(is_buffed[2]){
+      is_buffed[2]=0;
+      player.HP+=5;
+      if(player.HP>10) player.HP=10;
+   }
+   if(is_buffed[3]&&ti_buff[0]-ti_buff[3]>=10000) is_buffed[3]=0;
+
 }
 
 
@@ -165,7 +177,7 @@ void crash(){
             if(enemy[j].alive){
                //有待修改
                if((pl_bullet[i].x>=enemy[j].x&&pl_bullet[i].x<=enemy[j].x+80)
-                  &&(pl_bullet[i].y<=enemy[j].y+100&&pl_bullet[i].y>=enemy[j].y)){
+                  &&(pl_bullet[i].y<=enemy[j].y+70&&pl_bullet[i].y>=enemy[j].y)){
                      //改成扣血
                   pl_bullet[i].alive=0;
                   if(is_buffed[3]){
@@ -184,9 +196,10 @@ void crash(){
             if(prop[i].x-75<=player.x&&prop[i].x+40>=player.x
             &&prop[i].y-75<=player.y&&prop[i].y+40>=player.y){
                prop[i].alive=0;
-               
+
                int tmp=prop[i].type;
                is_buffed[tmp]=1;
+               ti_buff[tmp]=GetTickCount();
             }
          }
       }
@@ -200,17 +213,17 @@ void cr_plbullet(){
       if(!pl_bullet[i].alive){
          switch(count){
             case 0:
-               pl_bullet[i].x=player.x+40;
+               pl_bullet[i].x=player.x+30;
                break;
             case 1:
-               pl_bullet[i].x=player.x;
+               pl_bullet[i].x=player.x-10;
                break;
             case 2:
-               pl_bullet[i].x=player.x+80;
+               pl_bullet[i].x=player.x+70;
                break;
          }
 
-         pl_bullet[i].y=player.y;
+         pl_bullet[i].y=player.y-10;
          pl_bullet[i].alive=1;
          count+=1;
       }
@@ -229,13 +242,14 @@ void cr_enemy(){
       for(int i=0;i<30;i++){
          if(!enemy[i].alive){
             enemy[i].x=rand()%430+40;
-            // enemy[i].y=-20;
-            enemy[i].y=340;
+            enemy[i].y=-20;
+            // enemy[i].y=340;
             enemy[i].alive=1;
             enemy[i].type=rand()%3+1;
-            enemy[i].HP=3;
-            count+=1;
+            enemy[i].HP=5;
             ti_crenemy1=ti_crenemy2;
+            count+=1;
+            
          }
          if(count) break;
       }
