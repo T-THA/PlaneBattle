@@ -20,7 +20,7 @@ typedef struct Plane{//能动的东西（包括自己，敌人，道具，子弹
    int y=0;
    int alive=0;
    int HP=0;
-   int direction=0; //移动方向的参数 敌机 0向下 1向上 2向左 3向右 子弹 0上下 1左下 2 右下 
+   int direction=0; //移动方向的参数 敌机 0向下 1向上 2向左 3向右 子弹 0上下 1左下 2 右下 3(boss 速射)
    int type=0; // 0为玩家 子弹 
    // enemy模式下 1 为knd啥都不会干，只能前进  2为mfy会发射子弹  3为ena会发射子弹且血厚
    // buff模式下 1 攻击模式 2治疗 3子弹伤害
@@ -30,8 +30,9 @@ typedef struct Plane{//能动的东西（包括自己，敌人，道具，子弹
 void pl_action();
 void en_action();
 void en_action_x(int number);
-void bu_action();
+void bu_action();//然而这个包括了我 小怪 boss的子弹
 void pr_action();
+void boss_action();
 
 void crash();
 void Drawinit();//图像加载进来
@@ -42,6 +43,7 @@ void cr_boss();
 void cr_enbullet(int type,int number);
 void cr_plbullet();
 void cr_plbullet_buff();
+void cr_bossbullet(int n);
 void cr_prop(int x,int y);
 
 
@@ -49,6 +51,7 @@ void cr_prop(int x,int y);
 
 plane player;
 plane boss;
+plane boss_bullet[100];
 plane pl_bullet[30];
 plane enemy[30];
 plane en_bullet[30][30];
@@ -59,6 +62,7 @@ DWORD ti_shoot1,ti_shoot2;
 DWORD ti_crenemy1,ti_crenemy2;
 DWORD ti_buff[4];
 DWORD ti_crenbu[30][2];
+DWORD ti_crbossbu1,ti_crbossbu2;
 
 
 //因为子弹速度太快 用这个来控速
@@ -66,10 +70,11 @@ int bu_action_limit;
 int pl_action_limit;
 int en_action_limit;
 int pr_action_limit;
-
+int boss_action_limit;
 int is_buffed[4];
 
 int stageflag1=1,stageflag2=1,stageflag3=1,stageflag_boss;
+int bossprop;
 int score;
 
 int main(){
@@ -90,10 +95,12 @@ int main(){
       if(player.alive) pl_action();
       bu_action();
       en_action();
+      boss_action();
       pr_action();
-      if(stageflag1&&stageflag2&&stageflag3){
+      if(stageflag1&&stageflag2&&stageflag3&&(!stageflag_boss)){
          cr_boss();
-      }else{
+         stageflag_boss=1;
+      }else if(!stageflag_boss){
          cr_enemy();
       }
       
@@ -187,6 +194,8 @@ void en_action(){
       }
       
    }
+
+  
    if(en_action_limit>=120) en_action_limit%=120;
 }
 
@@ -203,6 +212,43 @@ void en_action_x(int number){
       }
    }
 }
+
+
+void boss_action(){
+   boss_action_limit+=1;
+   if(boss.HP%50==0&&bossprop!=boss.HP){
+      cr_prop(boss.x+150,boss.y+220);
+      bossprop=boss.HP;
+   }
+   if(boss.HP<=0){
+      boss.alive=0;
+   }
+   if(boss.alive){
+
+      if(boss.y<=50&&boss_action_limit%50==0) boss.y+=1;
+      if(boss.y==50) ti_crbossbu1=GetTickCount();
+      if(boss.y>50&&boss_action_limit%40==0){
+         if(boss.direction==2){
+            boss.x-=1;
+            if(boss.x<=0) boss.direction=3;
+         }if(boss.direction==3){
+            boss.x+=1;
+            if(boss.x>=210) boss.direction=2;
+         }
+
+         ti_crbossbu2=GetTickCount();
+         if(ti_crbossbu2-ti_crbossbu1>=1000){
+            cr_bossbullet(rand()%3);
+            ti_crbossbu1=ti_crbossbu2;
+      }
+      }
+      
+   }
+}
+
+
+
+
 
 void bu_action(){
    bu_action_limit+=1;
@@ -243,7 +289,32 @@ void bu_action(){
       }
    }
 
-   if(bu_action_limit>=8) bu_action_limit%=8;
+   for(int i=0;i<100;i++){
+      if(boss_bullet[i].y>=680) boss_bullet[i].alive=0;
+      if(boss_bullet[i].alive){
+         switch(boss_bullet[i].type){
+            case 0:
+               if(bu_action_limit%3==0) boss_bullet[i].y+=1;
+               break;
+            case 1:
+               if(bu_action_limit%6==0){
+                  boss_bullet[i].y+=2;
+                  boss_bullet[i].x-=1;
+               }
+               break;
+            case 2:
+               if(bu_action_limit%6==0){
+                  boss_bullet[i].y+=2;
+                  boss_bullet[i].x+=1;
+               }
+               break;
+            case 3:
+               if(bu_action_limit%2==0) boss_bullet[i].y+=1;
+               break;
+         }
+      }
+   }
+   if(bu_action_limit>=24) bu_action_limit%=24;
 }
 
 
@@ -259,7 +330,7 @@ void pr_action(){
    if(is_buffed[1]&&ti_buff[0]-ti_buff[1]>=10000) is_buffed[1]=0;
    if(is_buffed[2]){
       is_buffed[2]=0;
-      player.HP+=5;
+      player.HP+=4;
       if(player.HP>10) player.HP=10;
    }
    if(is_buffed[3]&&ti_buff[0]-ti_buff[3]>=10000) is_buffed[3]=0;
@@ -272,6 +343,22 @@ void crash(){
    //我的子弹-敌人 道具-我 敌人子弹-我 敌人-我
    for(int i=0;i<30;i++){
       if(pl_bullet[i].alive){
+         if(boss.alive){
+            if((pl_bullet[i].x>=boss.x+10&&pl_bullet[i].x<=boss.x+213)
+                  &&(pl_bullet[i].y<=boss.y+183&&pl_bullet[i].y>=boss.y+10)){
+               if(is_buffed[3]){
+                  boss.HP-=2;
+               }else{
+                  boss.HP-=1;
+               }
+               pl_bullet[i].alive=0;
+            }
+            if(player.x>=boss.x-60&&player.x<=boss.x+213-70
+                  &&player.y>=boss.y-60&&player.y<=boss.y+113){
+               player.HP=0;
+            }
+         }
+
          for(int j=0;j<30;j++){
             if(enemy[j].alive){
                //有待修改
@@ -309,13 +396,21 @@ void crash(){
                   player.HP-=1;
                }
          }
-         // if(boss.alive){
-         //    if(boss)
-         // }
+         if(boss.alive){
+            for(int i=0;i<100;i++){
+               if(boss_bullet[i].alive){
+                  if(boss_bullet[i].x-35<=player.x&&boss_bullet[i].x-25>=player.x
+                  &&boss_bullet[i].y-35<=player.y&&boss_bullet[i].y-25>=player.y){
+                     boss_bullet[i].alive=0;
+                     player.HP-=1;
+                  }
+               }
+            }
+         }
          for(int j=0;j<30;j++){
             if(en_bullet[i][j].alive){
-               if(en_bullet[i][j].x-60<=player.x&&en_bullet[i][j].x>=player.x
-                  &&en_bullet[i][j].y-60<=player.y&&en_bullet[i][j].y>=player.y){
+               if(en_bullet[i][j].x-35<=player.x&&en_bullet[i][j].x-25>=player.x
+                  &&en_bullet[i][j].y-35<=player.y&&en_bullet[i][j].y-25>=player.y){
 
                   en_bullet[i][j].alive=0;
                   player.HP-=1;
@@ -373,6 +468,50 @@ void cr_enbullet(int type ,int number){
    }
 }
 
+void cr_bossbullet(int n){
+   int count=0;
+   switch (n){
+   case 0://直的
+      for(int i=0;i<100;i++){
+         if(!boss_bullet[i].alive){
+            boss_bullet[i].alive=1;
+            boss_bullet[i].type=0;
+            boss_bullet[i].x=boss.x+151+125-(count%3)*125;
+            boss_bullet[i].y=boss.y+100+(count/3)*45;
+            count+=1;
+         }
+         if(count==24) break;
+      }
+      break;
+   case 1://斜的
+      for(int i=0;i<100;i++){
+         if(!boss_bullet[i].alive){
+            boss_bullet[i].alive=1;
+            boss_bullet[i].type=(count+2)%3;
+            boss_bullet[i].x=boss.x+180-(count%3)*30;
+            boss_bullet[i].y=boss.y+180+(count/3)*60;
+            count+=1;
+         }
+         if(count==12) break;
+      }
+      break;
+   case 2://瞄准play的
+      for(int i=0;i<100;i++){
+         if(!boss_bullet[i].alive){
+            boss_bullet[i].alive=1;
+            boss_bullet[i].type=3;
+            boss_bullet[i].x=player.x+30; //没有写错
+            boss_bullet[i].y=boss.y+150+count*40;
+            count+=1;
+         }
+         if(count==6) break;
+      }
+      break;
+   
+   }
+}
+
+
 void cr_enemy(){
    int count=0;
    ti_crenemy2=GetTickCount();
@@ -411,6 +550,8 @@ void cr_boss(){
    boss.x=X/2-150;
    boss.y=-150;
    boss.HP=1000;
+   boss.direction=2;
+   
 }
 
 
@@ -447,7 +588,7 @@ void playerinit(){
 
    ti_shoot1=GetTickCount();
    ti_crenemy1=ti_shoot1;
-
+   
    srand(time(NULL));
 }
 
@@ -464,6 +605,12 @@ void imainit(){//图像初始化
    if(boss.alive){
       putimage(boss.x,boss.y,&an_mzkboss,NOTSRCERASE);
       putimage(boss.x,boss.y,&mzkboss,SRCINVERT);
+   }
+   for(int i=0;i<100;i++){
+      if(boss_bullet[i].alive){
+         putimage(boss_bullet[i].x,boss_bullet[i].y,&an_bullet,NOTSRCERASE);
+         putimage(boss_bullet[i].x,boss_bullet[i].y,&bullet,SRCINVERT);
+      }
    }
    for(int i=0;i<30;i++){
       if(pl_bullet[i].alive){
