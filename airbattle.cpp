@@ -15,8 +15,21 @@ IMAGE an_khn2,an_khn,an_ena,an_knd,an_mfy,an_mzkboss;
 IMAGE bullet,bullet2,prop1,prop2,prop3;
 IMAGE an_bullet,an_bullet2,an_prop1,an_prop2,an_prop3;
 
+typedef struct Plane{//能动的东西（包括自己，敌人，道具，子弹）相当于一个父类
+   int x=0;
+   int y=0;
+   int alive=0;
+   int HP=0;
+   int direction=0; //移动方向的参数 敌机 0向下 1向上 2向左 3向右 子弹 0上下 1左下 2 右下 
+   int type=0; // 0为玩家 子弹 
+   // enemy模式下 1 为knd啥都不会干，只能前进  2为mfy会发射子弹  3为ena会发射子弹且血厚
+   // buff模式下 1 攻击模式 2治疗 3子弹伤害
+}plane;
+
+
 void pl_action();
 void en_action();
+void en_action_x(int number);
 void bu_action();
 void pr_action();
 
@@ -25,6 +38,7 @@ void Drawinit();//图像加载进来
 void imainit();
 void playerinit();
 void cr_enemy();
+void cr_enbullet(int type,int number);
 void cr_plbullet();
 void cr_plbullet_buff();
 void cr_prop(int x,int y);
@@ -32,15 +46,7 @@ void stage1();
 void stage2();
 void stage3();
 
-typedef struct Plane{//能动的东西（包括自己，敌人，道具，子弹）相当于一个父类
-   int x=0;
-   int y=0;
-   int alive=0;
-   int HP=0;
-   int type=0; // 0为玩家 子弹 
-   // enemy模式下 1 为knd啥都不会干，只能前进  2为mfy会发射子弹  3为ena会发射子弹且血厚
-   // buff模式下 1 攻击模式 2治疗 3子弹伤害
-}plane;
+
 
 plane player;
 plane pl_bullet[30];
@@ -51,6 +57,7 @@ plane prop[30];
 DWORD ti_shoot1,ti_shoot2;
 DWORD ti_crenemy1,ti_crenemy2;
 DWORD ti_buff[4];
+DWORD ti_crenbu[30][2];
 
 
 //因为子弹速度太快 用这个来控速
@@ -104,11 +111,16 @@ void pl_action(){
    if(GetAsyncKeyState(VK_RIGHT)||GetAsyncKeyState('D')){
       if(player.x<=X-40&&pl_action_limit%3==0) player.x+=1;
    }
-   if(bu_action_limit>=3) bu_action_limit%=3;
-   //得加嗑药的判断
-   if(GetAsyncKeyState(VK_SPACE)){
+   if(pl_action_limit>=3) pl_action_limit%=3;
+   
+   if(1)
+   // if(GetAsyncKeyState(VK_SPACE))
+   {
       ti_shoot2=GetTickCount();
-      if((ti_shoot2-ti_shoot1>=150)){
+      if((ti_shoot2-ti_shoot1>=150)&&is_buffed[1]==0){
+         cr_plbullet();
+         ti_shoot1=ti_shoot2;
+      }else if(ti_shoot2-ti_shoot1>=100&&is_buffed[1]==1){
          cr_plbullet();
          ti_shoot1=ti_shoot2;
       }
@@ -119,15 +131,61 @@ void pl_action(){
 void en_action(){
    en_action_limit+=1;
    for(int i=0;i<30;i++){
-      if(enemy[i].alive&&enemy[i].HP<=0){
-         enemy[i].alive=0;
-         cr_prop(enemy[i].x,enemy[i].y);
+      if(enemy[i].alive){
+         if(enemy[i].HP<=0){
+            enemy[i].alive=0;
+            cr_prop(enemy[i].x,enemy[i].y);
+            break;
+         }
+         
+         if(enemy[i].type==1){
+            if(en_action_limit%30==0)  enemy[i].y+=1;
+            if(enemy[i].y>=610){
+               enemy[i].alive=0;
+               player.HP-=1;
+            }
+            
+         }
+         if(enemy[i].type==2){
+            if(en_action_limit%30==0&&enemy[i].y<=120)  enemy[i].y+=1;
+            else if(en_action_limit%60==0&&enemy[i].y>=120) en_action_x(i);
+            
+            ti_crenbu[i][1]=GetTickCount();
+            if(ti_crenbu[i][1]-ti_crenbu[i][0]>=4000){
+               cr_enbullet(2,i);
+               ti_crenbu[i][0]=ti_crenbu[i][1];
+            }
+            
+         }
+         if(enemy[i].type==3){
+            if(en_action_limit%60==0&&enemy[i].y<=200)  enemy[i].y+=1;
+            else if(en_action_limit%40==0&&enemy[i].y>=200) en_action_x(i);
+
+            ti_crenbu[i][1]=GetTickCount();
+            if(ti_crenbu[i][1]-ti_crenbu[i][0]>=3500){
+               cr_enbullet(3,i);
+               ti_crenbu[i][0]=ti_crenbu[i][1];
+            }
+         }
+         
       }
-      if(enemy[i].alive&&en_action_limit%20==0){
-         enemy[i].y+=1;
+      
+   }
+   if(en_action_limit>=120) en_action_limit%=120;
+}
+
+void en_action_x(int number){
+   if(enemy[number].direction==2){
+      enemy[number].x-=1;
+      if(enemy[number].x<=0){
+         enemy[number].direction=3;
+      }
+   }else if(enemy[number].direction==3){
+      enemy[number].x+=1;
+      if(enemy[number].x>=430){
+         enemy[number].direction=2;
       }
    }
-   if(en_action_limit>=20) en_action_limit%=20;
 }
 
 void bu_action(){
@@ -144,9 +202,32 @@ void bu_action(){
             pl_bullet[i].y-=1;
          }
       }
+
+      for(int j=0;j<30;j++){
+         if(en_bullet[i][j].y>=680){
+            en_bullet[i][j].alive=0;
+         }
+         if(en_bullet[i][j].alive){
+            if(bu_action_limit%8==0){
+               switch(en_bullet[i][j].direction){
+                  case 0:
+                     en_bullet[i][j].y+=2;
+                     break;
+                  case 1:
+                     en_bullet[i][j].y+=2;
+                     en_bullet[i][j].x+=1;
+                     break;
+                  case 2:
+                     en_bullet[i][j].y+=2;
+                     en_bullet[i][j].x-=1;
+                     break;
+               }
+            }
+         }
+      }
    }
 
-   if(bu_action_limit>=2) bu_action_limit%=2;
+   if(bu_action_limit>=8) bu_action_limit%=8;
 }
 
 
@@ -171,12 +252,14 @@ void pr_action(){
 
 
 void crash(){
+   //有四种碰撞
+   //我的子弹-敌人 道具-我 敌人子弹-我 敌人-我
    for(int i=0;i<30;i++){
       if(pl_bullet[i].alive){
          for(int j=0;j<30;j++){
             if(enemy[j].alive){
                //有待修改
-               if((pl_bullet[i].x>=enemy[j].x&&pl_bullet[i].x<=enemy[j].x+80)
+               if((pl_bullet[i].x>=enemy[j].x-5&&pl_bullet[i].x<=enemy[j].x+82)
                   &&(pl_bullet[i].y<=enemy[j].y+70&&pl_bullet[i].y>=enemy[j].y)){
                      //改成扣血
                   pl_bullet[i].alive=0;
@@ -235,19 +318,45 @@ void cr_plbullet(){
    }
 }
 
+void cr_enbullet(int type ,int number){
+   int count=0;
+   if(type>=2){
+      for(int i=0;i<30;i++){
+         if(!en_bullet[number][i].alive){
+            en_bullet[number][i].x=enemy[number].x+45;
+            en_bullet[number][i].y=enemy[number].y+70;
+            en_bullet[number][i].alive=1;
+            en_bullet[number][i].direction=count;
+            count+=1;
+         }
+
+         if(type==2&&count==1) break;
+         if(type==3&&count==3) break;
+      }
+   }
+}
+
 void cr_enemy(){
    int count=0;
    ti_crenemy2=GetTickCount();
-   if(ti_crenemy2-ti_crenemy1>5000){
+   if(ti_crenemy2-ti_crenemy1>4000){
       for(int i=0;i<30;i++){
          if(!enemy[i].alive){
-            enemy[i].x=rand()%430+40;
+            enemy[i].x=rand()%430;
             enemy[i].y=-20;
-            // enemy[i].y=340;
+
+            if(enemy[i].x>=210){
+               enemy[i].direction=2;
+            }else enemy[i].direction=3;
+            
             enemy[i].alive=1;
             enemy[i].type=rand()%3+1;
-            enemy[i].HP=5;
+            enemy[i].HP=35-5*enemy[i].type;
+            
+            
+
             ti_crenemy1=ti_crenemy2;
+            ti_crenbu[i][0]=GetTickCount();
             count+=1;
             
          }
@@ -283,11 +392,11 @@ void playerinit(){
    player.x=X/2;
    player.y=Y-100;
    player.alive=1;
-   player.HP=10;
+   player.HP=5;
    
 
    ti_shoot1=GetTickCount();
-   ti_crenemy1=GetTickCount();
+   ti_crenemy1=ti_shoot1;
 
    srand(time(NULL));
 }
@@ -297,40 +406,48 @@ void imainit(){//图像初始化
    putimage(0,0,&bg);
    putimage(player.x,player.y,&an_khn,NOTSRCERASE);//这两行顺序不能换
    putimage(player.x,player.y,&khn,SRCINVERT);
+
    for(int i=0;i<30;i++){
       if(pl_bullet[i].alive){
-         putimage(pl_bullet[i].x,pl_bullet[i].y,&an_bullet2,NOTSRCERASE);//这两行顺序不能换
+         putimage(pl_bullet[i].x,pl_bullet[i].y,&an_bullet2,NOTSRCERASE);
          putimage(pl_bullet[i].x,pl_bullet[i].y,&bullet2,SRCINVERT);
       }
-   }
-   for(int i=0;i<30;i++){
-      if(enemy[i].alive){
-         if(enemy[i].type==1){
-            putimage(enemy[i].x,enemy[i].y,&an_knd,NOTSRCERASE);//这两行顺序不能换
-            putimage(enemy[i].x,enemy[i].y,&knd,SRCINVERT);
-         }else if(enemy[i].type==2){
-            putimage(enemy[i].x,enemy[i].y,&an_mfy,NOTSRCERASE);//这两行顺序不能换
-            putimage(enemy[i].x,enemy[i].y,&mfy,SRCINVERT);
-         }else if(enemy[i].type==3){
-            putimage(enemy[i].x,enemy[i].y,&an_ena,NOTSRCERASE);//这两行顺序不能换
-            putimage(enemy[i].x,enemy[i].y,&ena,SRCINVERT);
-         }     
-      }
-   }
-   for(int i=0;i<30;i++){
+
       if(prop[i].alive){
          if(prop[i].type==1){
-            putimage(prop[i].x,prop[i].y,&an_prop1,NOTSRCERASE);//这两行顺序不能换
+            putimage(prop[i].x,prop[i].y,&an_prop1,NOTSRCERASE);
             putimage(prop[i].x,prop[i].y,&prop1,SRCINVERT);
          }else if(prop[i].type==2){
-            putimage(prop[i].x,prop[i].y,&an_prop2,NOTSRCERASE);//这两行顺序不能换
+            putimage(prop[i].x,prop[i].y,&an_prop2,NOTSRCERASE);
             putimage(prop[i].x,prop[i].y,&prop2,SRCINVERT);
          }else if(prop[i].type==3){
-            putimage(prop[i].x,prop[i].y,&an_prop3,NOTSRCERASE);//这两行顺序不能换
+            putimage(prop[i].x,prop[i].y,&an_prop3,NOTSRCERASE);
             putimage(prop[i].x,prop[i].y,&prop3,SRCINVERT);
          }   
       }
+
+      if(enemy[i].alive){
+         if(enemy[i].type==1){
+            putimage(enemy[i].x,enemy[i].y,&an_knd,NOTSRCERASE);
+            putimage(enemy[i].x,enemy[i].y,&knd,SRCINVERT);
+         }else if(enemy[i].type==2){
+            putimage(enemy[i].x,enemy[i].y,&an_mfy,NOTSRCERASE);
+            putimage(enemy[i].x,enemy[i].y,&mfy,SRCINVERT);
+         }else if(enemy[i].type==3){
+            putimage(enemy[i].x,enemy[i].y,&an_ena,NOTSRCERASE);
+            putimage(enemy[i].x,enemy[i].y,&ena,SRCINVERT);
+         }     
+      }
+
+      for(int j=0;j<30;j++){
+         if(en_bullet[i][j].alive){
+            putimage(en_bullet[i][j].x,en_bullet[i][j].y,&an_bullet,NOTSRCERASE);
+            putimage(en_bullet[i][j].x,en_bullet[i][j].y,&bullet,SRCINVERT);
+         }
+      }
+
    }
+   
 }
 
 
