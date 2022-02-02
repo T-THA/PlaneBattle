@@ -38,13 +38,12 @@ void Drawinit();//图像加载进来
 void imainit();
 void playerinit();
 void cr_enemy();
+
 void cr_enbullet(int type,int number);
 void cr_plbullet();
 void cr_plbullet_buff();
 void cr_prop(int x,int y);
-void stage1();
-void stage2();
-void stage3();
+
 
 
 
@@ -67,6 +66,8 @@ int en_action_limit;
 int pr_action_limit;
 
 int is_buffed[4];
+
+int stageflag1,stageflag2,stageflag3,stageflag_boss;
 
 int main(){
    // initgraph(X,Y,SHOWCONSOLE);//showconsole展示黑窗口
@@ -99,33 +100,39 @@ int main(){
 
 void pl_action(){
    pl_action_limit+=1;
-   if(GetAsyncKeyState(VK_UP)||GetAsyncKeyState('W')){
-      if(player.y>=-40&&pl_action_limit%3==0) player.y-=1;
-   }
-   if(GetAsyncKeyState(VK_DOWN)||GetAsyncKeyState('S')){
-      if(player.y<=Y-40&&pl_action_limit%3==0) player.y+=1;
-   }
-   if(GetAsyncKeyState(VK_LEFT)||GetAsyncKeyState('A')){
-      if(player.x>=-40&&pl_action_limit%3==0) player.x-=1;
-   }
-   if(GetAsyncKeyState(VK_RIGHT)||GetAsyncKeyState('D')){
-      if(player.x<=X-40&&pl_action_limit%3==0) player.x+=1;
-   }
-   if(pl_action_limit>=3) pl_action_limit%=3;
-   
-   if(1)
-   // if(GetAsyncKeyState(VK_SPACE))
-   {
-      ti_shoot2=GetTickCount();
-      if((ti_shoot2-ti_shoot1>=150)&&is_buffed[1]==0){
-         cr_plbullet();
-         ti_shoot1=ti_shoot2;
-      }else if(ti_shoot2-ti_shoot1>=100&&is_buffed[1]==1){
-         cr_plbullet();
-         ti_shoot1=ti_shoot2;
+   if(player.alive){
+      if(GetAsyncKeyState(VK_UP)||GetAsyncKeyState('W')){
+         if(player.y>=-40&&pl_action_limit%3==0) player.y-=1;
       }
-      
+      if(GetAsyncKeyState(VK_DOWN)||GetAsyncKeyState('S')){
+         if(player.y<=Y-40&&pl_action_limit%3==0) player.y+=1;
+      }
+      if(GetAsyncKeyState(VK_LEFT)||GetAsyncKeyState('A')){
+         if(player.x>=-40&&pl_action_limit%3==0) player.x-=1;
+      }
+      if(GetAsyncKeyState(VK_RIGHT)||GetAsyncKeyState('D')){
+         if(player.x<=X-40&&pl_action_limit%3==0) player.x+=1;
+      }
+      if(pl_action_limit>=3) pl_action_limit%=3;
+   
+      if(1)
+   // if(GetAsyncKeyState(VK_SPACE))
+      {
+         ti_shoot2=GetTickCount();
+         if((ti_shoot2-ti_shoot1>=150)&&is_buffed[1]==0){
+            cr_plbullet();
+            ti_shoot1=ti_shoot2;
+         }else if(ti_shoot2-ti_shoot1>=100&&is_buffed[1]==1){
+            cr_plbullet();
+            ti_shoot1=ti_shoot2;
+         }   
+      }
+
+      if(player.HP<=0){
+         player.alive=0;
+      }
    }
+   
 }
 
 void en_action(){
@@ -259,7 +266,7 @@ void crash(){
          for(int j=0;j<30;j++){
             if(enemy[j].alive){
                //有待修改
-               if((pl_bullet[i].x>=enemy[j].x-5&&pl_bullet[i].x<=enemy[j].x+82)
+               if((pl_bullet[i].x>=enemy[j].x-5&&pl_bullet[i].x<=enemy[j].x+83)
                   &&(pl_bullet[i].y<=enemy[j].y+70&&pl_bullet[i].y>=enemy[j].y)){
                      //改成扣血
                   pl_bullet[i].alive=0;
@@ -277,12 +284,29 @@ void crash(){
       if(player.alive){
          if(prop[i].alive){
             if(prop[i].x-75<=player.x&&prop[i].x+40>=player.x
-            &&prop[i].y-75<=player.y&&prop[i].y+40>=player.y){
+               &&prop[i].y-75<=player.y&&prop[i].y+40>=player.y){
                prop[i].alive=0;
 
                int tmp=prop[i].type;
                is_buffed[tmp]=1;
                ti_buff[tmp]=GetTickCount();
+            }
+         }
+
+         if(enemy[i].alive){
+            if(enemy[i].x-70<=player.x&&enemy[i].x+80>=player.x
+               &&enemy[i].y-80<=player.y&&enemy[i].y+70>=player.y){
+                  enemy[i].HP=0;
+                  player.HP-=1;
+               }
+         }
+         for(int j=0;j<30;j++){
+            if(en_bullet[i][j].alive){
+               if(en_bullet[i][j].x-60<=player.x&&en_bullet[i][j].x>=player.x
+                  &&en_bullet[i][j].y-60<=player.y&&en_bullet[i][j].y>=player.y){
+                     en_bullet[i][j].alive=0;
+                     player.HP-=1;
+                  }
             }
          }
       }
@@ -404,8 +428,13 @@ void playerinit(){
 
 void imainit(){//图像初始化
    putimage(0,0,&bg);
-   putimage(player.x,player.y,&an_khn,NOTSRCERASE);//这两行顺序不能换
-   putimage(player.x,player.y,&khn,SRCINVERT);
+   if(player.alive){
+      putimage(player.x,player.y,&an_khn,NOTSRCERASE);//这两行顺序不能换
+      putimage(player.x,player.y,&khn,SRCINVERT);
+   }else{
+      putimage(player.x,player.y,&an_khn2,NOTSRCERASE);
+      putimage(player.x,player.y,&khn2,SRCINVERT);
+   }
 
    for(int i=0;i<30;i++){
       if(pl_bullet[i].alive){
@@ -453,7 +482,7 @@ void imainit(){//图像初始化
 
 void Drawinit(){//图像先加载进来
    loadimage(&bg,"./mzk.jpg");//510*680的瑞希哥背景
-   loadimage(&khn,"./khn.jpg");//80*80
+   loadimage(&khn,"./khn.jpg");
    loadimage(&an_khn,"./antikhn.jpg");
    loadimage(&khn2,"./khn2.jpg");
    loadimage(&an_khn2,"./antikhn2.jpg");
