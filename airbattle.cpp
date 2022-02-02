@@ -38,7 +38,7 @@ void Drawinit();//图像加载进来
 void imainit();
 void playerinit();
 void cr_enemy();
-
+void cr_boss();
 void cr_enbullet(int type,int number);
 void cr_plbullet();
 void cr_plbullet_buff();
@@ -48,10 +48,12 @@ void cr_prop(int x,int y);
 
 
 plane player;
+plane boss;
 plane pl_bullet[30];
 plane enemy[30];
 plane en_bullet[30][30];
 plane prop[30];
+
 
 DWORD ti_shoot1,ti_shoot2;
 DWORD ti_crenemy1,ti_crenemy2;
@@ -67,7 +69,8 @@ int pr_action_limit;
 
 int is_buffed[4];
 
-int stageflag1,stageflag2,stageflag3,stageflag_boss;
+int stageflag1=1,stageflag2=1,stageflag3=1,stageflag_boss;
+int score;
 
 int main(){
    // initgraph(X,Y,SHOWCONSOLE);//showconsole展示黑窗口
@@ -88,8 +91,12 @@ int main(){
       bu_action();
       en_action();
       pr_action();
-      // printf("1\n");//test
-      cr_enemy();
+      if(stageflag1&&stageflag2&&stageflag3){
+         cr_boss();
+      }else{
+         cr_enemy();
+      }
+      
       crash();
    }
    EndBatchDraw();
@@ -141,6 +148,7 @@ void en_action(){
       if(enemy[i].alive){
          if(enemy[i].HP<=0){
             enemy[i].alive=0;
+            score+=1;
             cr_prop(enemy[i].x,enemy[i].y);
             break;
          }
@@ -149,6 +157,7 @@ void en_action(){
             if(en_action_limit%30==0)  enemy[i].y+=1;
             if(enemy[i].y>=610){
                enemy[i].alive=0;
+               score+=1;
                player.HP-=1;
             }
             
@@ -300,13 +309,17 @@ void crash(){
                   player.HP-=1;
                }
          }
+         // if(boss.alive){
+         //    if(boss)
+         // }
          for(int j=0;j<30;j++){
             if(en_bullet[i][j].alive){
                if(en_bullet[i][j].x-60<=player.x&&en_bullet[i][j].x>=player.x
                   &&en_bullet[i][j].y-60<=player.y&&en_bullet[i][j].y>=player.y){
-                     en_bullet[i][j].alive=0;
-                     player.HP-=1;
-                  }
+
+                  en_bullet[i][j].alive=0;
+                  player.HP-=1;
+               }
             }
          }
       }
@@ -363,7 +376,8 @@ void cr_enbullet(int type ,int number){
 void cr_enemy(){
    int count=0;
    ti_crenemy2=GetTickCount();
-   if(ti_crenemy2-ti_crenemy1>4000){
+   
+   if(ti_crenemy2-ti_crenemy1>6000-(stageflag1+stageflag2)*1000){
       for(int i=0;i<30;i++){
          if(!enemy[i].alive){
             enemy[i].x=rand()%430;
@@ -374,7 +388,7 @@ void cr_enemy(){
             }else enemy[i].direction=3;
             
             enemy[i].alive=1;
-            enemy[i].type=rand()%3+1;
+            enemy[i].type=rand()%(1+stageflag1+stageflag2)+1;
             enemy[i].HP=35-5*enemy[i].type;
             
             
@@ -384,10 +398,22 @@ void cr_enemy(){
             count+=1;
             
          }
-         if(count) break;
+         if(count==2*(1+stageflag1+stageflag2)) break;
       }
    }
+   if(score>=10) stageflag1=1;
+   if(score>=34) stageflag2=1;
+   if(score>=76) stageflag3=1;
 }
+
+void cr_boss(){
+   boss.alive=1;
+   boss.x=X/2-150;
+   boss.y=-150;
+   boss.HP=1000;
+}
+
+
 void cr_prop(int x,int y){
    int tmp=rand()%100;
    if(tmp<=30){
@@ -435,7 +461,10 @@ void imainit(){//图像初始化
       putimage(player.x,player.y,&an_khn2,NOTSRCERASE);
       putimage(player.x,player.y,&khn2,SRCINVERT);
    }
-
+   if(boss.alive){
+      putimage(boss.x,boss.y,&an_mzkboss,NOTSRCERASE);
+      putimage(boss.x,boss.y,&mzkboss,SRCINVERT);
+   }
    for(int i=0;i<30;i++){
       if(pl_bullet[i].alive){
          putimage(pl_bullet[i].x,pl_bullet[i].y,&an_bullet2,NOTSRCERASE);
