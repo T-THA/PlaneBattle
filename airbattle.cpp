@@ -9,11 +9,13 @@
 #define X 510
 #define Y 680
 // 窗口的大小是510*680 飞机的大小是80*80
-IMAGE bg;
-IMAGE khn2,khn,ena,knd,mfy,mzkboss;
-IMAGE an_khn2,an_khn,an_ena,an_knd,an_mfy,an_mzkboss;
+IMAGE bg,an_blood,begin_bg,win_bg,lose_bg,blood;
+IMAGE khn2,khn,ena,knd,mfy,mzkboss,mzkboss2;
+IMAGE an_khn2,an_khn,an_ena,an_knd,an_mfy,an_mzkboss,an_mzkboss2;
 IMAGE bullet,bullet2,prop1,prop2,prop3;
+IMAGE stage[5],an_stage[5];
 IMAGE an_bullet,an_bullet2,an_prop1,an_prop2,an_prop3;
+
 
 typedef struct Plane{//能动的东西（包括自己，敌人，道具，子弹）相当于一个父类
    int x=0;
@@ -45,7 +47,7 @@ void cr_plbullet();
 void cr_plbullet_buff();
 void cr_bossbullet(int n);
 void cr_prop(int x,int y);
-
+void cr_stagebg(int n);
 
 
 
@@ -56,13 +58,15 @@ plane pl_bullet[30];
 plane enemy[30];
 plane en_bullet[30][30];
 plane prop[30];
-
+// plane stagebg0,stagebg1,stagebg2,stagebg3,stagebgboss;
+plane stagebg[5];
 
 DWORD ti_shoot1,ti_shoot2;
 DWORD ti_crenemy1,ti_crenemy2;
 DWORD ti_buff[4];
 DWORD ti_crenbu[30][2];
 DWORD ti_crbossbu1,ti_crbossbu2;
+DWORD ti_bg1,ti_bg2;
 
 
 //因为子弹速度太快 用这个来控速
@@ -73,9 +77,13 @@ int pr_action_limit;
 int boss_action_limit;
 int is_buffed[4];
 
-int stageflag1=1,stageflag2=1,stageflag3=1,stageflag_boss;
+int stageflag1,stageflag2,stageflag3,stageflag_boss;
+int imageflag0,imageflag1,imageflag2,imageflag3,imageflagboss;
+int beginflag;
+int gameover;
 int bossprop;
 int score;
+int num;//敌机产生总数
 
 int main(){
    // initgraph(X,Y,SHOWCONSOLE);//showconsole展示黑窗口
@@ -88,8 +96,13 @@ int main(){
    
    //双缓冲绘图 解决闪烁问题
    BeginBatchDraw();
-   
+   imainit();
+   FlushBatchDraw();
+   char tmp=getch();
+   beginflag=1;
    while(1){
+      if(!gameover)
+      {
       imainit();
       FlushBatchDraw();
       if(player.alive) pl_action();
@@ -97,14 +110,40 @@ int main(){
       en_action();
       boss_action();
       pr_action();
-      if(stageflag1&&stageflag2&&stageflag3&&(!stageflag_boss)){
+      if(score==0&&num==0){
+         cr_stagebg(1);
+      }
+      if(score==10&&num==10){
+         stageflag1=1;
+         cr_stagebg(2);
+      }
+      if(score==34&&num==34){
+         stageflag2=1;
+         cr_stagebg(3);
+      }
+      if(score==76&&num==76){
+         stageflag3=1;
+         cr_stagebg(4);
+      }
+      if(stageflag1&&stageflag2&&stageflag3&&(!stageflag_boss)&&stagebg[4].alive==0){
          cr_boss();
          stageflag_boss=1;
       }else if(!stageflag_boss){
-         cr_enemy();
+         if(num==0||num==10||num==34||num==36){
+            if(num==score){
+               if(!(stagebg[0].alive||stagebg[1].alive||stagebg[2].alive
+                  ||stagebg[3].alive||stagebg[4].alive)){
+                  cr_enemy();
+               }
+            }
+         }else if(num<76){
+            cr_enemy();
+         }
       }
-      
+         
       crash();
+
+      }
    }
    EndBatchDraw();
    return 0;
@@ -161,7 +200,7 @@ void en_action(){
          }
          
          if(enemy[i].type==1){
-            if(en_action_limit%30==0)  enemy[i].y+=1;
+            if(en_action_limit%40==0)  enemy[i].y+=1;
             if(enemy[i].y>=610){
                enemy[i].alive=0;
                score+=1;
@@ -220,8 +259,9 @@ void boss_action(){
       cr_prop(boss.x+150,boss.y+220);
       bossprop=boss.HP;
    }
-   if(boss.HP<=0){
+   if(boss.HP<=0&&stageflag_boss==1){
       boss.alive=0;
+      score=100;
    }
    if(boss.alive){
 
@@ -409,8 +449,8 @@ void crash(){
          }
          for(int j=0;j<30;j++){
             if(en_bullet[i][j].alive){
-               if(en_bullet[i][j].x-35<=player.x&&en_bullet[i][j].x-25>=player.x
-                  &&en_bullet[i][j].y-35<=player.y&&en_bullet[i][j].y-25>=player.y){
+               if(en_bullet[i][j].x-40<=player.x&&en_bullet[i][j].x-20>=player.x
+                  &&en_bullet[i][j].y-40<=player.y&&en_bullet[i][j].y-20>=player.y){
 
                   en_bullet[i][j].alive=0;
                   player.HP-=1;
@@ -507,7 +547,7 @@ void cr_bossbullet(int n){
          if(count==6) break;
       }
       break;
-   
+      
    }
 }
 
@@ -516,7 +556,7 @@ void cr_enemy(){
    int count=0;
    ti_crenemy2=GetTickCount();
    
-   if(ti_crenemy2-ti_crenemy1>6000-(stageflag1+stageflag2)*1000){
+   if(ti_crenemy2-ti_crenemy1>6000){
       for(int i=0;i<30;i++){
          if(!enemy[i].alive){
             enemy[i].x=rand()%430;
@@ -535,23 +575,22 @@ void cr_enemy(){
             ti_crenemy1=ti_crenemy2;
             ti_crenbu[i][0]=GetTickCount();
             count+=1;
+            num+=1;
             
          }
          if(count==2*(1+stageflag1+stageflag2)) break;
       }
    }
-   if(score>=10) stageflag1=1;
-   if(score>=34) stageflag2=1;
-   if(score>=76) stageflag3=1;
+   
 }
 
 void cr_boss(){
    boss.alive=1;
    boss.x=X/2-150;
    boss.y=-150;
-   boss.HP=1000;
+   boss.HP=1500;
    boss.direction=2;
-   
+   num+=1;
 }
 
 
@@ -579,11 +618,24 @@ void cr_prop(int x,int y){
    
 }
 
+void cr_stagebg(int n){
+   if(!stagebg[n].alive){
+      stagebg[n].alive=1;
+      ti_bg1=GetTickCount();
+   }
+
+   ti_bg2=GetTickCount();
+   if(ti_bg2-ti_bg1>=5000){
+      stagebg[n].alive=0;
+      // ti_bg1=ti_bg2;
+   }
+}
+
 void playerinit(){
    player.x=X/2;
    player.y=Y-100;
    player.alive=1;
-   player.HP=5;
+   player.HP=10;
    
 
    ti_shoot1=GetTickCount();
@@ -594,7 +646,20 @@ void playerinit(){
 
 
 void imainit(){//图像初始化
-   putimage(0,0,&bg);
+   if(beginflag){
+      if(boss.alive==0&&stageflag_boss==1){
+         gameover=1;
+         putimage(0,0,&win_bg);
+      }else if(player.alive==0){
+         gameover=1;
+         putimage(0,0,&lose_bg);
+      }else{
+         putimage(0,0,&bg);
+      }
+   }else{
+      putimage(0,0,&begin_bg);
+   }
+   
    if(player.alive){
       putimage(player.x,player.y,&an_khn,NOTSRCERASE);//这两行顺序不能换
       putimage(player.x,player.y,&khn,SRCINVERT);
@@ -602,10 +667,15 @@ void imainit(){//图像初始化
       putimage(player.x,player.y,&an_khn2,NOTSRCERASE);
       putimage(player.x,player.y,&khn2,SRCINVERT);
    }
-   if(boss.alive){
+
+   if(boss.alive&&stageflag_boss){
       putimage(boss.x,boss.y,&an_mzkboss,NOTSRCERASE);
       putimage(boss.x,boss.y,&mzkboss,SRCINVERT);
+   }else if(boss.alive==0&&stageflag_boss==1){
+      putimage(boss.x,boss.y,&an_mzkboss2,NOTSRCERASE);
+      putimage(boss.x,boss.y,&mzkboss2,SRCINVERT);
    }
+
    for(int i=0;i<100;i++){
       if(boss_bullet[i].alive){
          putimage(boss_bullet[i].x,boss_bullet[i].y,&an_bullet,NOTSRCERASE);
@@ -652,12 +722,24 @@ void imainit(){//图像初始化
       }
 
    }
-   
+   for(int i=0;i<5;i++){
+      if(stagebg[i].alive){
+         putimage(stagebg[i].x,stagebg[i].y,&an_stage[i],NOTSRCERASE);
+         putimage(stagebg[i].x,stagebg[i].y,&stage[i],SRCINVERT);
+      }
+   }
+   for(int i=0;i<player.HP;i++){
+      putimage(0,640-35*i,&an_blood,NOTSRCERASE);
+      putimage(0,640-35*i,&blood,SRCINVERT);
+   }
 }
 
 
 void Drawinit(){//图像先加载进来
    loadimage(&bg,"./mzk.jpg");//510*680的瑞希哥背景
+   loadimage(&begin_bg,"./bg2.jpg");
+   loadimage(&win_bg,"./bg4.jpg");
+   loadimage(&lose_bg,"./bg3.jpg");
    loadimage(&khn,"./khn.jpg");
    loadimage(&an_khn,"./antikhn.jpg");
    loadimage(&khn2,"./khn2.jpg");
@@ -670,6 +752,8 @@ void Drawinit(){//图像先加载进来
    loadimage(&an_mfy,"./antimfy.jpg");
    loadimage(&mzkboss,"./mzkboss.jpg");
    loadimage(&an_mzkboss,"./antimzkboss.jpg");
+   loadimage(&mzkboss2,"./mzkboss2.jpg");
+   loadimage(&an_mzkboss2,"./antimzkboss2.jpg");
    loadimage(&bullet,"./bullet.jpg");//20*20
    loadimage(&an_bullet,"./antibullet.jpg");
    loadimage(&bullet2,"./bullet2.jpg");//20*20
@@ -680,4 +764,15 @@ void Drawinit(){//图像先加载进来
    loadimage(&an_prop2,"./antiprop_cure.jpg");
    loadimage(&prop3,"./prop_energy.jpg");
    loadimage(&an_prop3,"./antiprop_energy.jpg");
+
+   loadimage(&stage[1],"./stage1.jpg");
+   loadimage(&an_stage[1],"./antistage1.jpg");
+   loadimage(&stage[2],"./stage2.jpg");
+   loadimage(&an_stage[2],"./antistage2.jpg");
+   loadimage(&stage[3],"./stage3.jpg");
+   loadimage(&an_stage[3],"./antistage3.jpg");
+   loadimage(&stage[4],"./stageboss.jpg");
+   loadimage(&an_stage[4],"./antistageboss.jpg");
+   loadimage(&blood,"./blood.jpg");
+   loadimage(&an_blood,"./antiblood.jpg");
 }
