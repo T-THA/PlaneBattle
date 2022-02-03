@@ -148,7 +148,7 @@ int main(){
          stageflag_boss=1;
       }else if(!stageflag_boss){
 
-         if(num==0||num==10||num==34||num==36){
+         if(num==0||num==10||num==34){
             if(num==score){
                if(!(stagebg[0].alive||stagebg[1].alive||stagebg[2].alive
                   ||stagebg[3].alive||stagebg[4].alive)){
